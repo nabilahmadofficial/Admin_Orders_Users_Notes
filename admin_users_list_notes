@@ -1,0 +1,85 @@
+/** 
+ * Plugin Name: Admin Users Notes
+ * Plugin URI: https://nabilahmad.com
+ * Description: Add a notes column to the admin Users table
+ * Version: 1.5
+ * Author: Nabil Ahmad
+ * Author URI: https://nabilahmad.com
+ */
+
+class Admin_Users_Notes {
+    /**
+     * Admin_Plugins_Notes constructor.
+     */
+    public function __construct() {
+        add_filter('manage_users_columns', array($this, 'add_notes_column'));
+        add_action('manage_users_custom_column', array($this, 'display_notes_column'), 10, 3);
+        add_action('admin_footer-users.php', array($this, 'add_js_to_users_page'));
+        add_action('wp_ajax_save_user_note', array($this, 'save_user_note'));
+    }
+
+    /**
+     * Add "Notes" column to plugins table.
+     *
+     * @param $columns
+     * @return mixed
+     */
+    public function add_notes_column($columns) {
+        $columns['notes'] = __('Notes', 'codewp');
+        return $columns;
+    }
+
+    /**
+     * Display the notes column.
+     *
+     * @param $column_name
+     * @param $plugin_file
+     * @param $plugin_data
+     */
+    public function display_notes_column($value, $column_name, $user_id) {
+        if ('notes' == $column_name) {
+            $user_notes = get_user_meta($user_id, 'user_notes', true);
+            if (current_user_can('edit_users')) {
+                return '<textarea class="user_notes" data-user="'.$user_id.'">' . esc_textarea($user_notes) . '</textarea>';
+            } else {
+                return '<textarea class="user_notes" data-user="'.$user_id.'" readonly>' . esc_textarea($user_notes) . '</textarea>';
+            }
+        }
+        return $value;
+    }
+
+    /**
+     * Add JavaScript to plugins page.
+     */
+    public function add_js_to_users_page() {
+        ?>
+        <script type="text/javascript">
+            jQuery(function($) {
+                $('.user_notes').on('blur', function() {
+                    var user = $(this).data('user');
+                    var note = $(this).val();
+                    $.post(ajaxurl, {
+                        action: 'save_user_note',
+                        user: user,
+                        note: note,
+                        security: '<?php echo wp_create_nonce('save_user_note'); ?>'
+                    });
+                });
+            });
+        </script>
+        <?php
+    }
+
+    /**
+     * Save plugin note.
+     */
+    public function save_user_note() {
+        check_ajax_referer('save_user_note', 'security');
+        $user = sanitize_text_field($_POST['user']);
+        $note = sanitize_textarea_field($_POST['note']);
+        update_user_meta($user, 'user_notes', $note);
+        wp_die();
+    }
+}
+
+new Admin_Users_Notes();
